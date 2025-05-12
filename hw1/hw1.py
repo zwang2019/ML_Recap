@@ -119,7 +119,7 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
     if select_all:
         feat_idx = list(range(raw_x_train.shape[1]))
     else:
-        feat_idx = list(range(35, raw_x_train.shape[1]))  # TODO: Select suitable feature columns.
+        feat_idx = list(range(1, raw_x_train.shape[1]))  # TODO: Select suitable feature columns.
 
     return raw_x_train[:, feat_idx], raw_x_valid[:, feat_idx], raw_x_test[:, feat_idx], y_train, y_valid
 
@@ -134,9 +134,11 @@ def trainer(train_loader, valid_loader, model, config, device):
     # TODO: Please check https://pytorch.org/docs/stable/optim.html to get more available algorithms.
     # TODO: L2 regularization (optimizer(weight decay...) or implement by your self).
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=0.7)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=0.7)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=1e-5)
 
-    writer = SummaryWriter(comment='tryingout_tensorboard')  # Writer of tensoboard.
+    ################################ comment here ################################
+    writer = SummaryWriter(comment='adam')  # Writer of tensoboard.
 
     if not os.path.isdir('./models'):
         os.mkdir('./models')  # Create directory of saving models.
@@ -205,7 +207,7 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     config = {
         'seed': 5201314,  # Your seed number, you can pick your lucky number. :)
-        'select_all': True,  # Whether to use all features.
+        'select_all': False,  # Whether to use all features.
         'valid_ratio': 0.2,  # validation_size = train_size * valid_ratio
         'n_epochs': 5000,  # Number of epochs.
         'batch_size': 256,
