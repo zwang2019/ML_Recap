@@ -89,6 +89,7 @@ class COVID19Dataset(Dataset):
 # Neural Network Model
 # Try out different model architectures by modifying the class below.
 
+
 class My_Model(nn.Module):
     def __init__(self, input_dim):
         super(My_Model, self).__init__()
@@ -96,15 +97,54 @@ class My_Model(nn.Module):
         self.layers = nn.Sequential(
             nn.Linear(input_dim, 16),
             nn.ReLU(),
-            nn.Linear(16, 8),
+
+            nn.Linear(16, 14),
             nn.ReLU(),
-            nn.Linear(8, 1)
+            nn.Linear(14, 12),
+            nn.ReLU(),
+            nn.Linear(12, 8),
+            nn.ReLU(),
+            # nn.Dropout(p=0.01),
+            nn.Linear(8, 6),
+            nn.ReLU(),
+            nn.Linear(6, 4),
+            nn.ReLU(),
+            nn.Linear(4, 2),
+            nn.ReLU(),
+            nn.Linear(2, 1)
         )
 
     def forward(self, x):
         x = self.layers(x)
         x = x.squeeze(1) # (B, 1) -> (B)
         return x
+
+
+'''
+class My_Model(nn.Module):
+    def __init__(self, input_dim):
+        super(My_Model, self).__init__()
+        # TODO: modify model's structure, be aware of dimensions.
+        self.layers = nn.Sequential(
+            nn.Linear(input_dim, 24),
+            nn.ReLU(),
+            nn.Linear(24, 16),
+            nn.ReLU(),
+            # nn.Dropout(p=0.01),
+            nn.Linear(16, 8),
+            nn.ReLU(),
+            nn.Linear(8, 4),
+            nn.ReLU(),
+            nn.Linear(4, 2),
+            nn.ReLU(),
+            nn.Linear(2, 1)
+        )
+
+    def forward(self, x):
+        x = self.layers(x)
+        x = x.squeeze(1) # (B, 1) -> (B)
+        return x
+'''
 
 ########################################################################
 
@@ -134,11 +174,12 @@ def trainer(train_loader, valid_loader, model, config, device):
     # TODO: Please check https://pytorch.org/docs/stable/optim.html to get more available algorithms.
     # TODO: L2 regularization (optimizer(weight decay...) or implement by your self).
 
-    # optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=0.7)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=1e-5)
+    optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=0.9, weight_decay=1e-5)
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=config['learning_rate'], weight_decay=1e-5)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)  # Learning rate decay.
 
     ################################ comment here ################################
-    writer = SummaryWriter(comment='adam')  # Writer of tensoboard.
+    writer = SummaryWriter(comment='SGD_wd5_e10000_es1500_addlayer12')  # Writer of tensoboard.
 
     if not os.path.isdir('./models'):
         os.mkdir('./models')  # Create directory of saving models.
@@ -188,6 +229,7 @@ def trainer(train_loader, valid_loader, model, config, device):
             best_loss = mean_valid_loss
             torch.save(model.state_dict(), config['save_path'])  # Save your best model
             print('Saving model with loss {:.3f}...'.format(best_loss))
+            writer.add_scalar('MSE/valid', mean_valid_loss, step)
             early_stop_count = 0
         else:
             early_stop_count += 1
@@ -195,6 +237,9 @@ def trainer(train_loader, valid_loader, model, config, device):
         if early_stop_count >= config['early_stop']:
             print('\nModel is not improving, so we halt the training session.')
             return
+
+    # writer.add_hparams({'lr': config['learning_rate'], 'weight_decay': 1e-5},{'loss': best_loss})
+
 
 ########################################################################
 
@@ -209,10 +254,11 @@ if __name__ == '__main__':
         'seed': 5201314,  # Your seed number, you can pick your lucky number. :)
         'select_all': False,  # Whether to use all features.
         'valid_ratio': 0.2,  # validation_size = train_size * valid_ratio
-        'n_epochs': 5000,  # Number of epochs.
+        'n_epochs': 20000,  # Number of epochs.
         'batch_size': 256,
         'learning_rate': 1e-5,
-        'early_stop': 600,  # If model has not improved for this many consecutive epochs, stop training.
+        # 'learning_rate': 1e-5,
+        'early_stop': 1500,  # If model has not improved for this many consecutive epochs, stop training.
         'save_path': './models/model.ckpt'  # Your model will be saved here.
     }
 
