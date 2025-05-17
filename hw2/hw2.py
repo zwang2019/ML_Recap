@@ -202,7 +202,7 @@ model_path = './models/model.ckpt'  # the path where the checkpoint will be save
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
 hidden_layers = 2          # the number of hidden layers
 hidden_dim = 1750           # the hidden dim
-dropout_rate = 0.25         # the dropout rate, you should not change the value
+dropout_rate = 0.50         # the dropout rate, you should not change the value
 weight_decay = 0.0
 
 
