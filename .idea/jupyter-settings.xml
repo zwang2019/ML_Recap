@@ -7,7 +7,6 @@
           <value>
             <JupyterConnectionParameters>
               <option name="managed" value="true" />
-              <option name="sdkHomePath" value="D:\PycharmProjects\Vivid_Darwin\venv\Scripts\python.exe" />
             </JupyterConnectionParameters>
           </value>
         </entry>
