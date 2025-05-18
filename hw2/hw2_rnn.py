@@ -148,6 +148,38 @@ class LibriDataset(Dataset):
 # Model
 # Feel free to modify the structure of the model.
 
+class RNNClassifier(nn.Module):
+    def __init__(self, input_dim_per_frame=39, concat_nframes=11, hidden_dim=256, output_dim=41, num_layers=2, dropout_rate=0.25):
+        super(RNNClassifier, self).__init__()
+
+        self.concat_nframes = concat_nframes
+        self.input_dim_per_frame = input_dim_per_frame
+        self.rnn = nn.LSTM(
+            input_size=input_dim_per_frame,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout_rate if num_layers > 1 else 0
+        )
+
+        self.classifier = nn.Sequential(
+            nn.BatchNorm1d(hidden_dim),   # 新增：对 hidden state 做 BatchNorm
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_dim, output_dim)
+        )
+
+    def forward(self, x):
+        # x shape: (B, concat_nframes * input_dim_per_frame)
+        B = x.size(0)
+        x = x.view(B, self.concat_nframes, self.input_dim_per_frame)  # reshape to (B, seq_len, input_dim_per_frame)
+
+        output, (h_n, c_n) = self.rnn(x)  # output: (B, seq_len, hidden_dim)
+        last_output = output[:, self.concat_nframes // 2, :]  # 取中间帧的输出作为分类依据
+
+        out = self.classifier(last_output)
+        return out
+
 class BasicBlock(nn.Module):
     def __init__(self, input_dim, output_dim, dropout_rate):
         super(BasicBlock, self).__init__()
@@ -200,13 +232,13 @@ model_path = './models/model.ckpt'  # the path where the checkpoint will be save
 # model parameters
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
-hidden_layers = 2          # the number of hidden layers
-hidden_dim = 1750           # the hidden dim
-dropout_rate = 0.75         # the dropout rate, you should not change the value
+hidden_layers = 4          # the number of hidden layers
+hidden_dim = 300           # the hidden dim
+dropout_rate = 0.25         # the dropout rate, you should not change the value
 weight_decay = 0.0
 
 
-writer = SummaryWriter(comment=f'DNN_Adam_WithBN+DP')  # Writer of tensoboard.
+writer = SummaryWriter(comment=f'RNN_Adam_WithBN+DP')  # Writer of tensoboard.
 
 ################################################################################################################################################
 
@@ -237,7 +269,15 @@ val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
 # create model, define a loss function, and optimizer
 
 
-model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim, dropout_rate=dropout_rate).to(device)
+# model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim, dropout_rate=dropout_rate).to(device)
+model = RNNClassifier(
+    input_dim_per_frame=39,
+    concat_nframes=concat_nframes,
+    hidden_dim=hidden_dim,
+    output_dim=41,
+    num_layers=hidden_layers,
+    dropout_rate=dropout_rate
+).to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -347,7 +387,15 @@ test_set = LibriDataset(test_X, None)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
 # load model
-model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+# model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+model = RNNClassifier(
+    input_dim_per_frame=39,
+    concat_nframes=concat_nframes,
+    hidden_dim=hidden_dim,
+    output_dim=41,
+    num_layers=hidden_layers,
+    dropout_rate=dropout_rate
+).to(device)
 model.load_state_dict(torch.load(model_path))
 
 # Make prediction.
