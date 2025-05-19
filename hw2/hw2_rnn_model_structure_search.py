@@ -236,13 +236,13 @@ def objective(trial):
     # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
     input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
     hidden_layers = trial.suggest_int('hidden_layers', 6, 8)          # the number of hidden layers
-    hidden_dim = trial.suggest_int('hidden_dim', 512, 1024, log=True)           # the hidden dim
+    hidden_dim = trial.suggest_int('hidden_dim', 450, 1024, log=True)           # the hidden dim
     dropout_rate = 0         # the dropout rate, you should not change the value
     weight_decay = 0.0
 
     trial_number = trial.number
 
-    writer = SummaryWriter(log_dir=f'./RNN_model_structure_search/trial_{trial_number}')  # Writer of tensoboard.
+    writer = SummaryWriter(log_dir=f'./RNN_model_structure_search_2/trial_{trial_number}')  # Writer of tensoboard.
 
     ################################################################################################################################################
 
@@ -401,7 +401,7 @@ def objective(trial):
 def run_distributed_search(storage_url, n_trials):
     # 加载或创建一个共享的 study
     study = optuna.create_study(
-        study_name="RNN_model_structure_search",  # 共享的 study 名称
+        study_name="RNN_model_structure_search_2",  # 共享的 study 名称
         storage=storage_url,            # 指向共享的 SQLite 文件
         load_if_exists=True,            # 如果 study 已存在，则加载它
         direction="maximize"            # 目标：最小化
@@ -416,7 +416,7 @@ def run_distributed_search(storage_url, n_trials):
 
 if __name__ == '__main__':
     storage_url = "sqlite:///RNN_model_structure_search.db"
-    n_trials = 20   # Number of trials to run
+    n_trials = 30   # Number of trials to run
     run_distributed_search(storage_url, n_trials)
 
 
