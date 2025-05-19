@@ -221,7 +221,7 @@ def objective(trial):
     # Hyper-parameters
     # data prarameters
     # TODO: change the value of "concat_nframes" for medium baseline
-    concat_nframes = trial.suggest_int('concat_nframes', 5, 21, step=2)   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
+    concat_nframes = trial.suggest_int('concat_nframes', 19, 71, step=2)   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
     train_ratio = 0.8   # the ratio of data used for training, the rest will be used for validation
 
     # training parameters
@@ -235,8 +235,8 @@ def objective(trial):
     # model parameters
     # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
     input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
-    hidden_layers = trial.suggest_int('hidden_layers', 2, 8)          # the number of hidden layers
-    hidden_dim = trial.suggest_int('hidden_dim', 64, 1024, log=True)           # the hidden dim
+    hidden_layers = trial.suggest_int('hidden_layers', 6, 8)          # the number of hidden layers
+    hidden_dim = trial.suggest_int('hidden_dim', 512, 1024, log=True)           # the hidden dim
     dropout_rate = 0         # the dropout rate, you should not change the value
     weight_decay = 0.0
 
@@ -390,12 +390,12 @@ def objective(trial):
                     'best_acc': best_acc
                     })
     '''
-
+    val_set_length = len(val_set)
     del train_set, val_set
     del train_loader, val_loader
     gc.collect()
 
-    return best_acc/len(val_set)
+    return best_acc/val_set_length
 
 
 def run_distributed_search(storage_url, n_trials):
@@ -418,3 +418,8 @@ if __name__ == '__main__':
     storage_url = "sqlite:///RNN_model_structure_search.db"
     n_trials = 20   # Number of trials to run
     run_distributed_search(storage_url, n_trials)
+
+
+
+# optuna-dashboard sqlite:///RNN_model_structure_search.db
+# tensorboard --logdir ./RNN_model_structure_search/
