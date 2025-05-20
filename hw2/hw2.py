@@ -186,7 +186,7 @@ class Classifier(nn.Module):
 # Hyper-parameters
 # data prarameters
 # TODO: change the value of "concat_nframes" for medium baseline
-concat_nframes = 11   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
+concat_nframes = 63   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
 train_ratio = 0.8   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
@@ -200,13 +200,13 @@ model_path = './models/model.ckpt'  # the path where the checkpoint will be save
 # model parameters
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
-hidden_layers = 2          # the number of hidden layers
-hidden_dim = 1750           # the hidden dim
-dropout_rate = 0.75         # the dropout rate, you should not change the value
-weight_decay = 0.0
+hidden_layers = 7          # the number of hidden layers
+hidden_dim = 760           # the hidden dim
+dropout_rate = 0.35         # the dropout rate, you should not change the value
+weight_decay = 7e-5
 
 
-writer = SummaryWriter(comment=f'DNN_Adam_WithBN+DP')  # Writer of tensoboard.
+writer = SummaryWriter(log_dir=f'./DNN_model_search/try_1')  # Writer of tensoboard.
 
 ################################################################################################################################################
 
@@ -239,7 +239,7 @@ val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
 
 model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim, dropout_rate=dropout_rate).to(device)
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 best_acc = 0.0
 step = 0

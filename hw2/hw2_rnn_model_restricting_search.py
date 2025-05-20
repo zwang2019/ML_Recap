@@ -228,8 +228,8 @@ def objective(trial):
     seed = 1213          # random seed
     batch_size = 512        # batch size
     num_epoch = 100         # the number of training epoch
-    learning_rate = 1e-4      # learning rate
-    early_stop = 10
+    learning_rate = trial.suggest_float("lr", 5e-6, 1e-3, log=True)      # learning rate
+    early_stop = 15
     model_path = './models/model.ckpt'  # the path where the checkpoint will be saved
 
     # model parameters
@@ -237,12 +237,12 @@ def objective(trial):
     input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
     hidden_layers = 7          # the number of hidden layers
     hidden_dim = 760           # the hidden dim
-    dropout_rate = 0         # the dropout rate, you should not change the value
-    weight_decay = 0.0
+    dropout_rate = trial.suggest_float("dropout_rate", 0, 0.5, step=0.05)         # the dropout rate, you should not change the value
+    weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
 
     trial_number = trial.number
 
-    writer = SummaryWriter(log_dir=f'./RNN_model_restricting_search/trial_{trial_number}')  # Writer of tensoboard.
+    writer = SummaryWriter(log_dir=f'./RNN_model_restriction_search/trial_{trial_number}')  # Writer of tensoboard.
 
     ################################################################################################################################################
 
@@ -283,7 +283,7 @@ def objective(trial):
         dropout_rate=dropout_rate
     ).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     best_acc = 0.0
     step = 0
@@ -401,7 +401,7 @@ def objective(trial):
 def run_distributed_search(storage_url, n_trials):
     # 加载或创建一个共享的 study
     study = optuna.create_study(
-        study_name="RNN_model_structure_search_2",  # 共享的 study 名称
+        study_name="RNN_model_restriction_search",  # 共享的 study 名称
         storage=storage_url,            # 指向共享的 SQLite 文件
         load_if_exists=True,            # 如果 study 已存在，则加载它
         direction="maximize"            # 目标：最小化
