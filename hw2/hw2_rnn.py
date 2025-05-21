@@ -147,41 +147,8 @@ class LibriDataset(Dataset):
 
 # Model
 # Feel free to modify the structure of the model.
-
-class RNNClassifier(nn.Module):
-    def __init__(self, input_dim_per_frame=39, concat_nframes=11, hidden_dim=256, output_dim=41, num_layers=2, dropout_rate=0.25):
-        super(RNNClassifier, self).__init__()
-
-        self.concat_nframes = concat_nframes
-        self.input_dim_per_frame = input_dim_per_frame
-        self.rnn = nn.LSTM(
-            input_size=input_dim_per_frame,
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=dropout_rate if num_layers > 1 else 0
-        )
-
-        self.classifier = nn.Sequential(
-            nn.BatchNorm1d(hidden_dim),   # 新增：对 hidden state 做 BatchNorm
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(hidden_dim, output_dim)
-        )
-
-    def forward(self, x):
-        # x shape: (B, concat_nframes * input_dim_per_frame)
-        B = x.size(0)
-        x = x.view(B, self.concat_nframes, self.input_dim_per_frame)  # reshape to (B, seq_len, input_dim_per_frame)
-
-        output, (h_n, c_n) = self.rnn(x)  # output: (B, seq_len, hidden_dim)
-        last_output = output[:, self.concat_nframes // 2, :]  # 取中间帧的输出作为分类依据
-
-        out = self.classifier(last_output)
-        return out
-
 class BasicBlock(nn.Module):
-    def __init__(self, input_dim, output_dim, dropout_rate):
+    def __init__(self, input_dim, output_dim, dropout_rate=0.15):
         super(BasicBlock, self).__init__()
 
         # TODO: apply batch normalization and dropout for strong baseline.
@@ -198,7 +165,6 @@ class BasicBlock(nn.Module):
         x = self.block(x)
         return x
 
-
 class Classifier(nn.Module):
     def __init__(self, input_dim, output_dim=41, hidden_layers=1, hidden_dim=256, dropout_rate=0.25):
         super(Classifier, self).__init__()
@@ -213,18 +179,59 @@ class Classifier(nn.Module):
         x = self.fc(x)
         return x
 
+class RNNClassifier(nn.Module):
+    def __init__(self, input_dim_per_frame=39, concat_nframes=11, hidden_dim=256, output_dim=41, num_layers=2, dropout_rate=0.25):
+        super(RNNClassifier, self).__init__()
+
+        self.concat_nframes = concat_nframes
+        self.input_dim_per_frame = input_dim_per_frame
+        self.hidden_size = hidden_dim
+        self.num_layers = num_layers
+        self.dropout_rate = dropout_rate
+        self.output_dim = output_dim
+
+        self.rnn = nn.LSTM(
+            input_size=self.input_dim_per_frame,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            batch_first=True,
+            dropout=self.dropout_rate if num_layers > 1 else 0,
+            bidirectional=True
+        )
+        '''
+        self.classifier = nn.Sequential(
+            nn.BatchNorm1d(2 * self.hidden_size),   # 新增：对 hidden state 做 BatchNorm
+            nn.ReLU(),
+            nn.Dropout(self.dropout_rate),
+            nn.Linear(2 * self.hidden_size, self.output_dim)
+        )
+        '''
+
+        self.fc = nn.Sequential(
+            # 修改成 2 * self.hidden_size 的原因是因为LSTM()中的bidirectional设置为了True，这表示使用Bi（双向）LSTM模型，所以需要修改输入维度以匹配
+            BasicBlock(2 * self.hidden_size, self.hidden_size),
+            nn.Linear(self.hidden_size, self.output_dim)
+        )
+
+    def forward(self, x):
+        # x.shape: (batch_size, seq_len, RNN_input_size)
+        x, _ = self.rnn(x)  # => (batch_size, seq_len, RNN_hidden_size)
+        x = x[:, -1]  # => (batch_size, RNN_hidden_size)
+        x = self.fc(x)  # => (batch_size, labels)
+        return x
+
 ################################################################################################################################################
 
 # Hyper-parameters
 # data prarameters
 # TODO: change the value of "concat_nframes" for medium baseline
-concat_nframes = 11   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
+concat_nframes = 63   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
 train_ratio = 0.8   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
 seed = 1213          # random seed
 batch_size = 512        # batch size
-num_epoch = 200         # the number of training epoch
+num_epoch = 300         # the number of training epoch
 learning_rate = 1e-4      # learning rate
 early_stop = 30
 model_path = './models/model.ckpt'  # the path where the checkpoint will be saved
@@ -232,13 +239,13 @@ model_path = './models/model.ckpt'  # the path where the checkpoint will be save
 # model parameters
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
-hidden_layers = 4          # the number of hidden layers
-hidden_dim = 300           # the hidden dim
-dropout_rate = 0.25         # the dropout rate, you should not change the value
-weight_decay = 0.0
+hidden_layers = 7          # the number of hidden layers
+hidden_dim = 760           # the hidden dim
+dropout_rate = 0.35         # the dropout rate, you should not change the value
+weight_decay = 7e-5
 
 
-writer = SummaryWriter(comment=f'RNN_Adam_WithBN+DP')  # Writer of tensoboard.
+writer = SummaryWriter(log_dir=f'./RNN_model_search/try_1')  # Writer of tensoboard.
 
 ################################################################################################################################################
 
@@ -279,7 +286,7 @@ model = RNNClassifier(
     dropout_rate=dropout_rate
 ).to(device)
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 best_acc = 0.0
 step = 0
@@ -296,6 +303,7 @@ for epoch in range(num_epoch):
     for i, batch in enumerate(tqdm(train_loader)):
         features, labels = batch
         features = features.to(device)
+        features = features.view(-1, concat_nframes, 39).to(device)  # feature.shape: (batch_size, seq_len, input_size)
         labels = labels.to(device)
 
         optimizer.zero_grad()
@@ -321,6 +329,7 @@ for epoch in range(num_epoch):
         for i, batch in enumerate(tqdm(val_loader)):
             features, labels = batch
             features = features.to(device)
+            features = features.view(-1, concat_nframes, 39).to(device)
             labels = labels.to(device)
             outputs = model(features)
 
@@ -343,7 +352,7 @@ for epoch in range(num_epoch):
         best_acc = val_acc
         torch.save(model.state_dict(), model_path)
         print(f'saving model with acc {best_acc/len(val_set):.5f}')
-        writer.add_scalar('val/best_acc', best_acc, step)
+        writer.add_scalar('val/best_acc', best_acc/len(val_set), step)
         early_stop_count = 0
     else:
         early_stop_count += 1
@@ -369,7 +378,7 @@ writer.add_hparams(
                 'dropout': dropout_rate,
                 },
                 {
-                'best_acc': best_acc
+                'best_acc': best_acc/len(val_set)
                 })
 
 del train_set, val_set
@@ -406,6 +415,7 @@ with torch.no_grad():
     for i, batch in enumerate(tqdm(test_loader)):
         features = batch
         features = features.to(device)
+        features = features.view(-1, concat_nframes, 39).to(device)
 
         outputs = model(features)
 

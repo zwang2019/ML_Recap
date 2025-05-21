@@ -303,7 +303,7 @@ for epoch in range(num_epoch):
         best_acc = val_acc
         torch.save(model.state_dict(), model_path)
         print(f'saving model with acc {best_acc/len(val_set):.5f}')
-        writer.add_scalar('val/best_acc', best_acc, step)
+        writer.add_scalar('val/best_acc', best_acc/len(val_set), step)
         early_stop_count = 0
     else:
         early_stop_count += 1
@@ -329,7 +329,7 @@ writer.add_hparams(
                 'dropout': dropout_rate,
                 },
                 {
-                'best_acc': best_acc
+                'best_acc': best_acc/len(val_set)
                 })
 
 del train_set, val_set
