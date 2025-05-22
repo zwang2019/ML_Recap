@@ -189,6 +189,7 @@ class RNNClassifier(nn.Module):
         self.num_layers = num_layers
         self.dropout_rate = dropout_rate
         self.output_dim = output_dim
+        self.bidirectional = True
 
         self.rnn = nn.LSTM(
             input_size=self.input_dim_per_frame,
@@ -196,7 +197,7 @@ class RNNClassifier(nn.Module):
             num_layers=self.num_layers,
             batch_first=True,
             dropout=self.dropout_rate if num_layers > 1 else 0,
-            bidirectional=True
+            bidirectional=self.bidirectional
         )
         '''
         self.classifier = nn.Sequential(
@@ -209,7 +210,7 @@ class RNNClassifier(nn.Module):
 
         self.fc = nn.Sequential(
             # 修改成 2 * self.hidden_size 的原因是因为LSTM()中的bidirectional设置为了True，这表示使用Bi（双向）LSTM模型，所以需要修改输入维度以匹配
-            BasicBlock(2 * self.hidden_size, self.hidden_size),
+            BasicBlock(self.hidden_size * 2 if self.bidirectional else self.hidden_size, self.hidden_size),
             nn.Linear(self.hidden_size, self.output_dim)
         )
 
@@ -225,27 +226,27 @@ class RNNClassifier(nn.Module):
 # Hyper-parameters
 # data prarameters
 # TODO: change the value of "concat_nframes" for medium baseline
-concat_nframes = 63   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
+concat_nframes = 21   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
 train_ratio = 0.8   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
 seed = 1213          # random seed
 batch_size = 512        # batch size
 num_epoch = 300         # the number of training epoch
-learning_rate = 1e-4      # learning rate
-early_stop = 30
+learning_rate = 1e-3      # learning rate
+early_stop = 15
 model_path = './models/model.ckpt'  # the path where the checkpoint will be saved
 
 # model parameters
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
-hidden_layers = 7          # the number of hidden layers
-hidden_dim = 760           # the hidden dim
-dropout_rate = 0.35         # the dropout rate, you should not change the value
+hidden_layers = 6          # the number of hidden layers
+hidden_dim = 512           # the hidden dim
+dropout_rate = 0.30         # the dropout rate, you should not change the value
 weight_decay = 7e-5
 
 
-writer = SummaryWriter(log_dir=f'./RNN_model_search/try_1')  # Writer of tensoboard.
+writer = SummaryWriter(log_dir=f'./RNN_model_search/lr_scheduler')  # Writer of tensoboard.
 
 ################################################################################################################################################
 
@@ -287,6 +288,10 @@ model = RNNClassifier(
 ).to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+# Create a learning rate scheduler
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.8, patience=5, threshold=0.05) # 5 轮没有优化（增长率 < threshold)就令 lr *= factor
+
 
 best_acc = 0.0
 step = 0
@@ -356,6 +361,11 @@ for epoch in range(num_epoch):
         early_stop_count = 0
     else:
         early_stop_count += 1
+
+    # update the learning rate
+    # Modify step() according to your scheduler
+    scheduler.step(mean_val_acc)
+
 
     if early_stop_count >= early_stop:
         print(f'Model is not improving, so we halt the training session at epoch {epoch+1}')
