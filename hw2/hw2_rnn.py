@@ -226,23 +226,23 @@ class RNNClassifier(nn.Module):
 # Hyper-parameters
 # data prarameters
 # TODO: change the value of "concat_nframes" for medium baseline
-concat_nframes = 21   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
-train_ratio = 0.8   # the ratio of data used for training, the rest will be used for validation
+concat_nframes = 63   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
+train_ratio = 0.95   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
 seed = 1213          # random seed
 batch_size = 512        # batch size
 num_epoch = 300         # the number of training epoch
-learning_rate = 1e-3      # learning rate
-early_stop = 15
+learning_rate = 8e-4      # learning rate
+early_stop = 6
 model_path = './models/model.ckpt'  # the path where the checkpoint will be saved
 
 # model parameters
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
-hidden_layers = 6          # the number of hidden layers
-hidden_dim = 512           # the hidden dim
-dropout_rate = 0.30         # the dropout rate, you should not change the value
+hidden_layers = 7          # the number of hidden layers
+hidden_dim = 760           # the hidden dim
+dropout_rate = 0.35         # the dropout rate, you should not change the value
 weight_decay = 7e-5
 
 
