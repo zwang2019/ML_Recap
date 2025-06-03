@@ -17,7 +17,6 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.optim import Optimizer, AdamW
 from torch.optim.lr_scheduler import LambdaLR
 
-import time
 import math
 import random
 
@@ -136,7 +135,6 @@ def get_dataloader(data_dir, batch_size, n_workers):
     # Split dataset into training dataset and validation dataset
     trainlen = int(0.9 * len(dataset))
     lengths = [trainlen, len(dataset) - trainlen]
-    print(f'lengths is {lengths}')
     trainset, validset = random_split(dataset, lengths)
 
     train_loader = DataLoader(
@@ -306,7 +304,7 @@ def valid(dataloader, model, criterion, device):
     model.eval()
     running_loss = 0.0
     running_accuracy = 0.0
-    pbar = tqdm(total=len(dataloader.dataset) // dataloader.batch_size, ncols=0, desc="Valid", unit=" uttr")
+    pbar = tqdm(total=len(dataloader.dataset) // dataloader.batch_size, ncols=0, desc="Valid", unit=" step")
 
     for i, batch in enumerate(dataloader):
         with torch.no_grad():
@@ -381,11 +379,7 @@ def main(
         try:
             batch = next(train_iterator)
         except StopIteration:
-            print('reloading')
-            s = time.time()
             train_iterator = iter(train_loader)
-            e = time.time()
-            print(f'finish loading with duration {e - s:.2f} seconds')
             batch = next(train_iterator)
 
         loss, accuracy = model_fn(batch, model, criterion, device)
