@@ -321,7 +321,7 @@ def valid(dataloader, model, criterion, device):
     pbar.close()
     model.train()
 
-    return running_accuracy / len(dataloader)
+    return running_loss / len(dataloader), running_accuracy / len(dataloader)
 
 ########################################################################################################################
 # Some hyperparameters + Training
@@ -338,6 +338,7 @@ def parse_args():
         "warmup_steps": 1000,
         "save_steps": 10000,
         "total_steps": 70000,
+        "early_stop": 10    # if not improving at n validation then stop.
     }
 
     return config
@@ -354,8 +355,11 @@ def main(
     warmup_steps,
     total_steps,
     save_steps,
+    early_stop
 ):
     """Main function."""
+    writer = SummaryWriter(log_dir=f'./attention_model/first_try')  # Writer of tensoboard.
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[Info]: Use {device} now!")
 
@@ -369,8 +373,11 @@ def main(
     scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
     print(f"[Info]: Finish creating model!",flush = True)
 
+    training_global_step = 0
+    early_stop_count = 0
     best_accuracy = -1.0
     best_state_dict = None
+    log_train_loss = []
 
     pbar = tqdm(total=valid_steps, ncols=0, desc="Train", unit=" step")
 
@@ -385,6 +392,10 @@ def main(
         loss, accuracy = model_fn(batch, model, criterion, device)
         batch_loss = loss.item()
         batch_accuracy = accuracy.item()
+
+        log_train_loss.append(batch_loss)
+        writer.add_scalar('train/loss', batch_loss, training_global_step)
+        writer.add_scalar('train/acc', batch_accuracy, training_global_step)
 
         # Updata model
         loss.backward()
@@ -404,12 +415,26 @@ def main(
         if (step + 1) % valid_steps == 0:
             pbar.close()
 
-            valid_accuracy = valid(valid_loader, model, criterion, device)
+            valid_loss, valid_accuracy = valid(valid_loader, model, criterion, device)
+
+            writer.add_scalar('val/loss', valid_loss, training_global_step)
+            writer.add_scalar('val/acc', valid_accuracy, training_global_step)
 
             # keep the best model
             if valid_accuracy > best_accuracy:
                 best_accuracy = valid_accuracy
                 best_state_dict = model.state_dict()
+                writer.add_scalar('val/best_acc', best_accuracy, training_global_step)
+                early_stop_count = 0
+            else:
+                early_stop_count += 1
+
+            mean_train_loss = sum(log_train_loss) / len(log_train_loss)
+            log_train_loss = []
+            validation_gap = valid_loss - mean_train_loss
+            writer.add_scalar('val/validation_gap', validation_gap, training_global_step)
+
+
 
             pbar = tqdm(total=valid_steps, ncols=0, desc="Train", unit=" step")
 
@@ -417,6 +442,12 @@ def main(
         if (step + 1) % save_steps == 0 and best_state_dict is not None:
             torch.save(best_state_dict, save_path)
             pbar.write(f"Step {step + 1}, best model saved. (accuracy={best_accuracy:.4f})")
+
+        if early_stop_count >= early_stop:
+            print(f'Model is not improving, so we halt the training session at step {training_global_step + 1}')
+            break
+
+        training_global_step += 1
 
     pbar.close()
 
@@ -456,7 +487,7 @@ def inference_args():
     config = {
         "data_dir": "./data",
         "model_path": "./model/model.ckpt",
-        "output_path": "./output.csv",
+        "output_path": "./outputs/output.csv",
     }
 
     return config
