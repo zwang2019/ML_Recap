@@ -182,7 +182,7 @@ def get_dataloader(data_dir, batch_size, n_workers):
 '''
 
 class Classifier(nn.Module):
-    def __init__(self, d_model=80, n_spks=600, dropout=0.1):
+    def __init__(self, d_model=160, n_spks=600, dropout=0.1):
         super().__init__()
         # Project the dimension of features from that of input into d_model.
         self.prenet = nn.Linear(40, d_model)
@@ -190,13 +190,14 @@ class Classifier(nn.Module):
         #   Change Transformer to Conformer.
         #   https://arxiv.org/abs/2005.08100
         self.encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, dim_feedforward=256, nhead=2
+            d_model=d_model, dim_feedforward=256, nhead=8
         )
-        # self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=2)
+        self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=4)
 
         # Project the the dimension of features from d_model into speaker nums.
         self.pred_layer = nn.Sequential(
             nn.Linear(d_model, d_model),
+            nn.BatchNorm1d(d_model),
             nn.Sigmoid(),
             nn.Linear(d_model, n_spks),
         )
@@ -213,7 +214,7 @@ class Classifier(nn.Module):
         # out: (length, batch size, d_model)
         out = out.permute(1, 0, 2)
         # The encoder layer expect features in the shape of (length, batch size, d_model).
-        out = self.encoder_layer(out)
+        out = self.encoder(out)
         # out: (batch size, length, d_model)
         out = out.transpose(0, 1)
         # mean pooling
@@ -337,7 +338,7 @@ def parse_args():
         "valid_steps": 2000,
         "warmup_steps": 1000,
         "save_steps": 10000,
-        "total_steps": 70000,
+        "total_steps": 80000,
         "early_stop": 10    # if not improving at n validation then stop.
     }
 
@@ -358,7 +359,7 @@ def main(
     early_stop
 ):
     """Main function."""
-    writer = SummaryWriter(log_dir=f'./attention_model/first_try')  # Writer of tensoboard.
+    writer = SummaryWriter(log_dir=f'./attention_model/max_try_2')  # Writer of tensoboard.
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[Info]: Use {device} now!")
